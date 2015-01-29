@@ -17,6 +17,7 @@ __bpydoc__ = """\
 # Lightmap issue fixed by Capricorn 76 Pty. Ltd. - www.capricorn76.com
 # Blender 2.63 compatiblity based on work by MTLZ, www.is06.com
 # With changes by Marianne Gagnon and Joerg Henrichs, supertuxkart.sf.net (Copyright (C) 2011-2012)
+# Coordinate system changes by RainWarrior (https://github.com/RainWarrior) (Copyright (C) 2015)
 #
 # LICENSE:
 # This program is free software; you can redistribute it and/or modify
@@ -80,10 +81,11 @@ per_face_vertices = {}
 the_scene = None
 
 #Transformation Matrix
-TRANS_MATRIX = mathutils.Matrix([[1,0,0,0],[0,0,1,0],[0,1,0,0],[0,0,0,1]])
-BONE_TRANS_MATRIX = mathutils.Matrix([[-1,0,0,0],[0,0,-1,0],[0,-1,0,0],[0,0,0,1]])
 
-DEBUG = False
+# Default bone direction in blender is +Z, in here it's +Y. Using this to make them the same
+BONE_Z_TO_Y = mathutils.Matrix.Rotation(-math.pi / 2., 4, 'X')
+
+DEBUG = True
 PROGRESS = True
 PROGRESS_VERBOSE = False
 
@@ -602,60 +604,65 @@ def write_node(objects=[]):
                 temp_buf.append(write_string(obj.name)) #Node Name
                 
                 position = matrix.to_translation()
-                temp_buf.append(write_float_triplet(position[0], position[1], position[2])) #Position X, Y, Z
+                #temp_buf.append(write_float_triplet(position[0], position[1], position[2])) #Position X, Y, Z
+                temp_buf.append(write_float_triplet(position[1], position[2], position[0])) #Position Y, Z, X
 
                 scale = matrix.to_scale()
-                temp_buf.append(write_float_triplet(scale[0], scale[2], scale[1])) #Scale X, Y, Z
+                #temp_buf.append(write_float_triplet(scale[0], scale[2], scale[1])) #Scale X, Y, Z
+                temp_buf.append(write_float_triplet(scale[1], scale[2], scale[0])) #Scale Y, Z, X
 
-                if DEBUG: print("        <arm name=", obj.name, " loc=", -position[0], position[1], position[2], " scale=", scale[0], scale[1], scale[2], "/>")
-                
                 quat = matrix.to_quaternion()
                 quat.normalize()
 
-                temp_buf.append(write_float_quad(quat.w, quat.x, quat.z, quat.y))
+                #temp_buf.append(write_float_quad(quat.w, quat.x, quat.z, quat.y))
+                temp_buf.append(write_float_quad(quat.w, quat.y, quat.z, quat.x))
+                if DEBUG: print("        <arm name=", obj.name, " loc=", position[0], position[1], position[2], " scale=", scale[0], scale[1], scale[2], " rot=", quat.w, quat.x, quat.y, quat.z, "/>")
             else:
                 if b3d_parameters.get("local-space"):
-                    matrix = TRANS_MATRIX.copy()
+                    matrix = mathutils.Matrix()
                     scale_matrix = mathutils.Matrix()
                 else:
-                    matrix = obj.matrix_world*TRANS_MATRIX
+                    matrix = obj.matrix_world
                     scale_matrix = obj.matrix_world.copy()
                 
                 
-                if bpy.app.version[1] >= 62:
-                    # blender 2.62 broke the API : Column-major access was changed to row-major access
-                    tmp = mathutils.Vector([matrix[0][1], matrix[1][1], matrix[2][1], matrix[3][1]])
-                    matrix[0][1] = matrix[0][2]
-                    matrix[1][1] = matrix[1][2]
-                    matrix[2][1] = matrix[2][2]
-                    matrix[3][1] = matrix[3][2]
+                #if bpy.app.version[1] >= 62:
+                #    # blender 2.62 broke the API : Column-major access was changed to row-major access
+                #    tmp = mathutils.Vector([matrix[0][1], matrix[1][1], matrix[2][1], matrix[3][1]])
+                #    matrix[0][1] = matrix[0][2]
+                #    matrix[1][1] = matrix[1][2]
+                #    matrix[2][1] = matrix[2][2]
+                #    matrix[3][1] = matrix[3][2]
                     
-                    matrix[0][2] = tmp[0]
-                    matrix[1][2] = tmp[1]
-                    matrix[2][2] = tmp[2]
-                    matrix[3][2] = tmp[3]
-                else:
-                    tmp = mathutils.Vector(matrix[1])
-                    matrix[1] = matrix[2]
-                    matrix[2] = tmp
+                #    matrix[0][2] = tmp[0]
+                #    matrix[1][2] = tmp[1]
+                #    matrix[2][2] = tmp[2]
+                #    matrix[3][2] = tmp[3]
+                #else:
+                #    tmp = mathutils.Vector(matrix[1])
+                #    matrix[1] = matrix[2]
+                #    matrix[2] = tmp
 
                 temp_buf.append(write_string(obj.name)) #Node Name
 
                 #print("Matrix : ", matrix)
                 position = matrix.to_translation()
 
-                temp_buf.append(write_float_triplet(position[0], position[2], position[1])) 
+                #temp_buf.append(write_float_triplet(position[0], position[2], position[1])) 
+                temp_buf.append(write_float_triplet(position[1], position[2], position[0])) 
 
                 scale = scale_matrix.to_scale()
-                temp_buf.append(write_float_triplet(scale[0], scale[2], scale[1]))
+                #temp_buf.append(write_float_triplet(scale[0], scale[2], scale[1]))
+                temp_buf.append(write_float_triplet(scale[1], scale[2], scale[0]))
 
                 quat = matrix.to_quaternion()
                 quat.normalize()
 
-                temp_buf.append(write_float_quad(quat.w, quat.x, quat.z, quat.y))
+                #temp_buf.append(write_float_quad(quat.w, quat.x, quat.z, quat.y))
+                temp_buf.append(write_float_quad(quat.w, quat.y, quat.z, quat.x))
                   
                 if DEBUG:
-                    print("        <position>",position[0],position[2],position[1],"</position>")
+                    print("        <position>",position[0],position[1],position[2],"</position>")
                     print("        <scale>",scale[0],scale[1],scale[2],"</scale>")
                     print("        <rotation>", quat.w, quat.x, quat.y, quat.z, "</rotation>")
             
@@ -675,69 +682,72 @@ def write_node(objects=[]):
                     
                     if parent:
 
-                        #print("==== "+bone.name+" ====")
-                        a = (bone.matrix_local)
+                        print("==== "+bone.name+" ====")
+                        a = bone.matrix_local * BONE_Z_TO_Y
+                        #a = bone.matrix_local
                         
-                        #print("A : [%.2f %.2f %.2f %.2f]" % (a[0][0], a[0][1], a[0][2], a[0][3]))
-                        #print("    [%.2f %.2f %.2f %.2f]" % (a[1][0], a[1][1], a[1][2], a[1][3]))
-                        #print("    [%.2f %.2f %.2f %.2f]" % (a[2][0], a[2][1], a[2][2], a[2][3]))
-                        #print("    [%.2f %.2f %.2f %.2f]" % (a[3][0], a[3][1], a[3][2], a[3][3]))
+                        print("A : [%.2f %.2f %.2f %.2f]" % (a[0][0], a[0][1], a[0][2], a[0][3]))
+                        print("    [%.2f %.2f %.2f %.2f]" % (a[1][0], a[1][1], a[1][2], a[1][3]))
+                        print("    [%.2f %.2f %.2f %.2f]" % (a[2][0], a[2][1], a[2][2], a[2][3]))
+                        print("    [%.2f %.2f %.2f %.2f]" % (a[3][0], a[3][1], a[3][2], a[3][3]))
                         
-                        b = (parent.matrix_local.inverted().to_4x4())
+                        b = (parent.matrix_local * BONE_Z_TO_Y).inverted().to_4x4()
+                        #b = parent.matrix_local.inverted().to_4x4()
                         
-                        #print("B : [%.2f %.2f %.2f %.2f]" % (b[0][0], b[0][1], b[0][2], b[0][3]))
-                        #print("    [%.2f %.2f %.2f %.2f]" % (b[1][0], b[1][1], b[1][2], b[1][3]))
-                        #print("    [%.2f %.2f %.2f %.2f]" % (b[2][0], b[2][1], b[2][2], b[2][3]))
-                        #print("    [%.2f %.2f %.2f %.2f]" % (b[3][0], b[3][1], b[3][2], b[3][3]))
+                        print("B : [%.2f %.2f %.2f %.2f]" % (b[0][0], b[0][1], b[0][2], b[0][3]))
+                        print("    [%.2f %.2f %.2f %.2f]" % (b[1][0], b[1][1], b[1][2], b[1][3]))
+                        print("    [%.2f %.2f %.2f %.2f]" % (b[2][0], b[2][1], b[2][2], b[2][3]))
+                        print("    [%.2f %.2f %.2f %.2f]" % (b[3][0], b[3][1], b[3][2], b[3][3]))
                         
                         par_matrix = b * a
                         
-                        transform = mathutils.Matrix([[1,0,0,0],[0,0,-1,0],[0,-1,0,0],[0,0,0,1]])
-                        par_matrix = transform*par_matrix*transform
+                        #transform = mathutils.Matrix([[1,0,0,0],[0,0,-1,0],[0,-1,0,0],[0,0,0,1]])
+                        # TODO check if not other way around
+                        #par_matrix = TRANS_MATRIX * par_matrix * TRANS_MATRIX_INV_TR
                         
                         # FIXME: that's ugly, find a clean way to change the matrix.....
-                        if bpy.app.version[1] >= 62:
-                            # blender 2.62 broke the API : Column-major access was changed to row-major access
-                            # TODO: test me
-                            par_matrix[1][3] = -par_matrix[1][3]
-                            par_matrix[2][3] = -par_matrix[2][3]
-                        else:
-                            par_matrix[3][1] = -par_matrix[3][1]
-                            par_matrix[3][2] = -par_matrix[3][2]
+                        #if bpy.app.version[1] >= 62:
+                        #    # blender 2.62 broke the API : Column-major access was changed to row-major access
+                        #    # TODO: test me
+                        #    par_matrix[1][3] = -par_matrix[1][3]
+                        #    par_matrix[2][3] = -par_matrix[2][3]
+                        #else:
+                        #    par_matrix[3][1] = -par_matrix[3][1]
+                        #    par_matrix[3][2] = -par_matrix[3][2]
                         
-                        #c = par_matrix
-                        #print("With parent")
-                        #print("C : [%.3f %.3f %.3f %.3f]" % (c[0][0], c[0][1], c[0][2], c[0][3]))
-                        #print("    [%.3f %.3f %.3f %.3f]" % (c[1][0], c[1][1], c[1][2], c[1][3]))
-                        #print("    [%.3f %.3f %.3f %.3f]" % (c[2][0], c[2][1], c[2][2], c[2][3]))
-                        #print("    [%.3f %.3f %.3f %.3f]" % (c[3][0], c[3][1], c[3][2], c[3][3]))
+                        c = par_matrix
+                        print("With parent")
+                        print("C : [%.3f %.3f %.3f %.3f]" % (c[0][0], c[0][1], c[0][2], c[0][3]))
+                        print("    [%.3f %.3f %.3f %.3f]" % (c[1][0], c[1][1], c[1][2], c[1][3]))
+                        print("    [%.3f %.3f %.3f %.3f]" % (c[2][0], c[2][1], c[2][2], c[2][3]))
+                        print("    [%.3f %.3f %.3f %.3f]" % (c[3][0], c[3][1], c[3][2], c[3][3]))
                         
                     else:
                         
-                        #print("==== "+bone.name+" ====")
-                        #print("Without parent")
+                        print("==== "+bone.name+" ====")
+                        print("Without parent")
 
-                        m = arm_matrix*bone.matrix_local
+                        m = arm_matrix * bone.matrix_local * BONE_Z_TO_Y
                         
-                        #c = arm.matrix_world
-                        #print("A : [%.3f %.3f %.3f %.3f]" % (c[0][0], c[0][1], c[0][2], c[0][3]))
-                        #print("    [%.3f %.3f %.3f %.3f]" % (c[1][0], c[1][1], c[1][2], c[1][3]))
-                        #print("    [%.3f %.3f %.3f %.3f]" % (c[2][0], c[2][1], c[2][2], c[2][3]))
-                        #print("    [%.3f %.3f %.3f %.3f]" % (c[3][0], c[3][1], c[3][2], c[3][3]))
+                        c = arm.matrix_world
+                        print("A : [%.3f %.3f %.3f %.3f]" % (c[0][0], c[0][1], c[0][2], c[0][3]))
+                        print("    [%.3f %.3f %.3f %.3f]" % (c[1][0], c[1][1], c[1][2], c[1][3]))
+                        print("    [%.3f %.3f %.3f %.3f]" % (c[2][0], c[2][1], c[2][2], c[2][3]))
+                        print("    [%.3f %.3f %.3f %.3f]" % (c[3][0], c[3][1], c[3][2], c[3][3]))
                         
-                        #c = bone.matrix_local
-                        #print("B : [%.3f %.3f %.3f %.3f]" % (c[0][0], c[0][1], c[0][2], c[0][3]))
-                        #print("    [%.3f %.3f %.3f %.3f]" % (c[1][0], c[1][1], c[1][2], c[1][3]))
-                        #print("    [%.3f %.3f %.3f %.3f]" % (c[2][0], c[2][1], c[2][2], c[2][3]))
-                        #print("    [%.3f %.3f %.3f %.3f]" % (c[3][0], c[3][1], c[3][2], c[3][3]))
+                        c = bone.matrix_local * BONE_Z_TO_Y
+                        print("B : [%.3f %.3f %.3f %.3f]" % (c[0][0], c[0][1], c[0][2], c[0][3]))
+                        print("    [%.3f %.3f %.3f %.3f]" % (c[1][0], c[1][1], c[1][2], c[1][3]))
+                        print("    [%.3f %.3f %.3f %.3f]" % (c[2][0], c[2][1], c[2][2], c[2][3]))
+                        print("    [%.3f %.3f %.3f %.3f]" % (c[3][0], c[3][1], c[3][2], c[3][3]))
                         
-                        par_matrix = m*mathutils.Matrix([[-1,0,0,0],[0,0,1,0],[0,1,0,0],[0,0,0,1]])
+                        par_matrix = m
                                                 
-                        #c = par_matrix
-                        #print("C : [%.3f %.3f %.3f %.3f]" % (c[0][0], c[0][1], c[0][2], c[0][3]))
-                        #print("    [%.3f %.3f %.3f %.3f]" % (c[1][0], c[1][1], c[1][2], c[1][3]))
-                        #print("    [%.3f %.3f %.3f %.3f]" % (c[2][0], c[2][1], c[2][2], c[2][3]))
-                        #print("    [%.3f %.3f %.3f %.3f]" % (c[3][0], c[3][1], c[3][2], c[3][3]))
+                        c = par_matrix
+                        print("C : [%.3f %.3f %.3f %.3f]" % (c[0][0], c[0][1], c[0][2], c[0][3]))
+                        print("    [%.3f %.3f %.3f %.3f]" % (c[1][0], c[1][1], c[1][2], c[1][3]))
+                        print("    [%.3f %.3f %.3f %.3f]" % (c[2][0], c[2][1], c[2][2], c[2][3]))
+                        print("    [%.3f %.3f %.3f %.3f]" % (c[3][0], c[3][1], c[3][2], c[3][3]))
                         
 
                     bone_stack[bone.name] = [par_matrix,parent,bone]
@@ -762,14 +772,12 @@ def write_node(objects=[]):
                     arm_pose = arm.pose
                     arm_matrix = arm.matrix_world
                     
-                    transform = mathutils.Matrix([[-1,0,0,0],[0,0,1,0],[0,1,0,0],[0,0,0,1]])
-                    arm_matrix = transform*arm_matrix
-
                     for bone_name in arm.data.bones.keys():
                         #bone_matrix = mathutils.Matrix(arm_pose.bones[bone_name].poseMatrix)
-                        bone_matrix = mathutils.Matrix(arm_pose.bones[bone_name].matrix)
+                        bone_matrix = mathutils.Matrix(arm_pose.bones[bone_name].matrix) * BONE_Z_TO_Y
+                        #bone_matrix = mathutils.Matrix(arm_pose.bones[bone_name].matrix)
                         
-                        #print("(outer loop) bone_matrix for",bone_name,"=", bone_matrix)
+                        print("(outer loop) bone_matrix for",bone_name,"=", bone_matrix)
                         
                         #print(bone_name,":",bone_matrix)
                         
@@ -800,25 +808,22 @@ def write_node(objects=[]):
                                 
                                 # if has parent
                                 if bone[BONE_PARENT]:
-                                    par_matrix = mathutils.Matrix(arm_pose.bones[bone[BONE_PARENT].name].matrix)
+                                    # FIXME
+                                    par_matrix = mathutils.Matrix(arm_pose.bones[bone[BONE_PARENT].name].matrix) * BONE_Z_TO_Y
                                     bone_matrix = par_matrix.inverted()*bone_matrix
                                 else:
-                                    if b3d_parameters.get("local-space"):
-                                        bone_matrix = bone_matrix*mathutils.Matrix([[-1,0,0,0],[0,0,1,0],[0,1,0,0],[0,0,0,1]])
-                                    else:
-                                        
-                                        #if frame_count == 1:
-                                        #    print("====",bone_name,"====")
-                                        #    print("arm_matrix = ", arm_matrix)
-                                        #    print("bone_matrix = ", bone_matrix)
-                                        
-                                        bone_matrix = arm_matrix*bone_matrix
-                                        
-                                        #if frame_count == 1:
-                                        #    print("arm_matrix*bone_matrix", bone_matrix)
+                                    #if frame_count == 1:
+                                    #    print("====",bone_name,"====")
+                                    #    print("arm_matrix = ", arm_matrix)
+                                    #    print("bone_matrix = ", bone_matrix)
+                                    
+                                    bone_matrix = arm_matrix * bone_matrix
+                                    
+                                    #if frame_count == 1:
+                                    #    print("arm_matrix*bone_matrix", bone_matrix)
                                         
                                 
-                                #print("bone_matrix =", bone_matrix)
+                                print("bone_matrix =", bone_matrix)
                                 
                                 bone_sca = bone_matrix.to_scale()
                                 bone_loc = bone_matrix.to_translation()
@@ -879,7 +884,6 @@ def write_node(objects=[]):
             if obj.type == "CAMERA":
                 data = obj.data
                 matrix = obj.getMatrix("worldspace")
-                matrix *= TRANS_MATRIX
 
                 if data.type == "ORTHO":
                     cam_type = 2
@@ -932,7 +936,6 @@ def write_node(objects=[]):
             if obj.type == "LAMP":
                 data = obj.getData()
                 matrix = obj.getMatrix("worldspace")
-                matrix *= TRANS_MATRIX
 
                 if data.type == 0:
                     lig_type = 2
@@ -1089,10 +1092,9 @@ def write_node_mesh_vrts(obj, data, obj_count, arm_action, exp_root):
             else:
                 vert_matrix = mathutils.Matrix.Translation(data.vertices[vert].co)
 
-            vert_matrix *= TRANS_MATRIX
             vcoord = vert_matrix.to_translation()
 
-            temp_buf.append(write_float_triplet(vcoord.x, vcoord.z, vcoord.y))
+            temp_buf.append(write_float_triplet(vcoord.y, vcoord.z, vcoord.x))
 
             #b = time.time()
             #time_in_a += b - a
@@ -1103,12 +1105,11 @@ def write_node_mesh_vrts(obj, data, obj_count, arm_action, exp_root):
                 if arm_action:
                     norm_matrix *= mesh_matrix
 
-                norm_matrix *= TRANS_MATRIX
                 normal_vector = norm_matrix.to_translation()
                 
-                temp_buf.append(write_float_triplet(normal_vector.x,  #NX
+                temp_buf.append(write_float_triplet(normal_vector.y,  #NX
                                                     normal_vector.z,  #NY
-                                                    normal_vector.y)) #NZ
+                                                    normal_vector.x)) #NZ
 
             #c = time.time()
             #time_in_b += c - b
@@ -1286,16 +1287,16 @@ def write_node_mesh_tris(obj, data, obj_count,arm_action,exp_root):
 
             vertices = per_face_vertices[face.index]
 
-            temp_buf.append(write_int(vertices[2])) #A
+            temp_buf.append(write_int(vertices[0])) #A
             temp_buf.append(write_int(vertices[1])) #B
-            temp_buf.append(write_int(vertices[0])) #C
+            temp_buf.append(write_int(vertices[2])) #C
 
             if DEBUG: print("            <face id=", vertices[2], vertices[1], vertices[0],"/> <!-- face",face.index,"-->")
 
             if len(face.vertices) == 4:
-                temp_buf.append(write_int(vertices[3])) #A
+                temp_buf.append(write_int(vertices[0])) #A
                 temp_buf.append(write_int(vertices[2])) #B
-                temp_buf.append(write_int(vertices[0])) #C
+                temp_buf.append(write_int(vertices[3])) #C
                 if DEBUG: print("            <face id=", vertices[3], vertices[2], vertices[0],"/> <!-- face",face.index,"-->")
 
         if DEBUG: print("        </brush>")
@@ -1330,22 +1331,17 @@ def write_node_node(ibone):
     
 
 
-    # FIXME: we should use the same matrix format everywhere to not require this
-    
     position = matrix.to_translation()
-    if bone[BONE_PARENT]:
-        temp_buf.append(write_float_triplet(-position[0], position[2], position[1]))
-    else:
-        temp_buf.append(write_float_triplet(position[0], position[2], position[1]))
+    temp_buf.append(write_float_triplet(position[1], position[2], position[0]))
     
     
     scale = matrix.to_scale()
-    temp_buf.append(write_float_triplet(scale[0], scale[2], scale[1]))
+    temp_buf.append(write_float_triplet(scale[1], scale[2], scale[0]))
 
     quat = matrix.to_quaternion()
     quat.normalize()
 
-    temp_buf.append(write_float_quad(quat.w, quat.x, quat.z, quat.y))
+    temp_buf.append(write_float_quad(quat.w, quat.y, quat.z, quat.x))
 
     temp_buf.append(write_node_bone(ibone))
     temp_buf.append(write_node_keys(ibone))
@@ -1394,22 +1390,15 @@ def write_node_keys(ibone):
             temp_buf.append(write_int(keys_stack[ikeys][0])) #Frame
 
             position = keys_stack[ikeys][2]
-            # FIXME: we should use the same matrix format everywhere and not require this
-            if b3d_parameters.get("local-space"):
-                if bone_stack[ibone][BONE_PARENT]:
-                    temp_buf.append(write_float_triplet(-position[0], position[2], position[1]))
-                else:
-                    temp_buf.append(write_float_triplet(position[0], position[2], position[1]))
-            else:
-                temp_buf.append(write_float_triplet(-position[0], position[1], position[2]))
+            temp_buf.append(write_float_triplet(position[1], position[2], position[0]))
 
             scale = keys_stack[ikeys][3]
-            temp_buf.append(write_float_triplet(scale[0], scale[1], scale[2]))
+            temp_buf.append(write_float_triplet(scale[1], scale[2], scale[0]))
 
             quat = keys_stack[ikeys][4]
             quat.normalize()
 
-            temp_buf.append(write_float_quad(quat.w, -quat.x, quat.y, quat.z))
+            temp_buf.append(write_float_quad(quat.w, quat.y, quat.z, quat.x))
             #break
 
     keys_buf += write_chunk(b"KEYS",b"".join(temp_buf))
